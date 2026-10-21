@@ -13,8 +13,30 @@ set -uo pipefail
 # 에이전트가 질문을 남긴 뒤(awaiting-user) 종료하면 사용자는 터미널에서 답할 창을 잃는다.
 # 라벨이 이 흐름의 SSOT 이므로 라벨로 가른다. 라벨 조회 실패 시에도 종료하지 않는다(fail-safe).
 # 이슈 번호·레포는 git issue-agent run 이 GIA_ISSUE / GIA_REPO 로 export 한다.
+# 그 값이 없으면(세션을 resume 등으로 손으로 다시 띄운 경우) 현재 브랜치(fix/issue-N)와 설정에서 찾는다.
+# 예전에는 값이 없으면 가드를 건너뛰고 그대로 종료해, 질문 대기 중인 세션이 죽을 수 있었다.
 ISSUE="${GIA_ISSUE:-}"
 REPO="${GIA_REPO:-}"
+CFG_AGENT=""
+if [ -z "$ISSUE" ] || [ -z "$REPO" ]; then
+  # shellcheck source=common.sh
+  source "$(dirname "$0")/common.sh"
+  CFG="$(gia_load_config > /dev/null 2>&1 && echo "$GIA_REPO|$GIA_BRANCH_PREFIX|$GIA_AGENT")" || CFG=""
+  BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  REST="${CFG#*|}"; PREFIX="${REST%%|*}"; CFG_AGENT="${REST#*|}"
+  [ -n "$CFG" ] || { PREFIX="fix/issue-"; CFG_AGENT=""; }
+  case "$BRANCH" in
+    "$PREFIX"*)
+      N="${BRANCH#"$PREFIX"}"
+      case "$N" in ''|*[!0-9]*) ;; *) ISSUE="${ISSUE:-$N}" ;; esac
+      ;;
+  esac
+  [ -n "$CFG" ] && REPO="${REPO:-${CFG%%|*}}"
+  if [ -n "$ISSUE" ] && [ -z "$REPO" ]; then
+    echo "  이슈 #$ISSUE 브랜치인데 레포를 알 수 없습니다(.issue-agent/config) — 안전을 위해 세션을 유지합니다."
+    exit 1
+  fi
+fi
 if [ -n "$ISSUE" ] && [ -n "$REPO" ]; then
   if LABELS="$(gh issue view "$ISSUE" --repo "$REPO" --json labels -q '.labels[].name' 2>/dev/null)"; then
     if printf '%s\n' "$LABELS" | grep -qx "awaiting-user"; then
@@ -35,7 +57,7 @@ if [ -n "$ISSUE" ] && [ -n "$REPO" ]; then
 fi
 
 # 1) 조상 에이전트 프로세스 탐색 후 종료 (실행 파일 경로에 claude/codex 가 들어 있다)
-AGENT="${GIA_AGENT:-claude}"
+AGENT="${GIA_AGENT:-${CFG_AGENT:-claude}}"
 pid="${PPID:-}"
 for _ in 1 2 3 4 5 6 7 8; do
   [ -z "$pid" ] && break
