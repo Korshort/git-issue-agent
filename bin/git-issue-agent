@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# git-issue-agent — GitHub Issue 를 작업 큐로 쓰는 에이전트 흐름 + 현황판. 레포마다 .issue-agent/config 를 읽는다.
+set -euo pipefail
+
+# 심볼릭 링크(~/.local/bin/git-issue-agent 등)로 불려도 실제 위치를 찾는다. macOS 기본 readlink 에 -f 가 없던 버전 대비.
+SRC="$0"
+while [ -L "$SRC" ]; do
+  DIR="$(cd "$(dirname "$SRC")" && pwd)"
+  SRC="$(readlink "$SRC")"
+  case "$SRC" in /*) ;; *) SRC="$DIR/$SRC" ;; esac
+done
+GIA_HOME="$(cd "$(dirname "$SRC")/.." && pwd)"
+LIB="$GIA_HOME/lib"
+
+usage() {
+  cat <<'EOF'
+git-issue-agent — 이슈 에이전트 흐름 + 현황판 (레포 루트의 .issue-agent/config 사용)
+`git issue-agent <명령>` 또는 `git-issue-agent <명령>` 으로 부른다
+
+  init [--agent claude|codex]  레포에 붙이기: 도구 점검 → 에이전트 선택 → .issue-agent/ → 라벨
+  run <N>              worktree 준비 → 세션(작업→리뷰→재작업→머지) → 머지됐으면 정리
+  merge <N> [--yes]    PR rebase 머지 (worktree 밖에서 부르면 정리까지)
+  close <N>            worktree·브랜치 제거 + 이슈 클로즈
+  label <N> <상태>     상태 라벨 교체 (ready|in-progress|on-review|rework|awaiting-user|none)
+  end                  세션 스스로 종료 (세션 내부 전용, awaiting-user 면 거부)
+  poll [초]            ready 이슈 감지 → 실행 명령 안내
+  labels [--dry-run]   레포에 상태 라벨 5종 생성 (옛 am:* 는 이름 변경)
+  tracker [옵션]       이슈 현황판 TUI (--interval SECS, --theme NAME)
+EOF
+}
+
+cmd="${1:-help}"
+[ $# -gt 0 ] && shift
+case "$cmd" in
+  init|run|merge|close|label|end|poll|labels) exec "$LIB/$cmd.sh" "$@" ;;
+  tracker) exec "$LIB/tracker.sh" "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac

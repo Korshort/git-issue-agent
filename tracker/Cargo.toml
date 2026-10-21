@@ -1,0 +1,17 @@
+[package]
+name = "git-issue-agent-tracker"
+version = "0.2.0"
+edition = "2021"
+description = "git-issue-agent issue status board TUI (GitHub issues + tmux sessions)"
+
+[[bin]]
+name = "git-issue-agent-tracker"
+path = "src/main.rs"
+
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
