@@ -21,7 +21,7 @@ gia_load_config() {
   top="$(git rev-parse --show-toplevel 2>/dev/null || echo "$GIA_WORKDIR")"
   cfg="$top/.issue-agent/config"
   [ -f "$cfg" ] || cfg="$GIA_WORKDIR/.issue-agent/config"
-  [ -f "$cfg" ] || gia_die ".issue-agent/config 가 없습니다 ($GIA_WORKDIR). README 의 '레포에 붙이기' 참고."
+  [ -f "$cfg" ] || gia_die ".issue-agent/config 가 없습니다 ($GIA_WORKDIR). 이 레포에 처음 붙이는 거면: git issue-agent init"
 
   GIA_REPO=""
   GIA_AGENT="claude"
